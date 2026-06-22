@@ -90,7 +90,13 @@ const heroGo = document.getElementById("heroGo");
 const resInput = document.getElementById("resInput");
 const resGo = document.getElementById("resGo");
 
+const statsTimeout = setTimeout(() => {
+  document.getElementById("count").innerHTML = `<a href="javascript:location.reload()" style="color:#999">please reload</a>`;
+  document.getElementById("count2").innerHTML = `<a href="javascript:location.reload()" style="color:#999">please reload</a>`;
+}, 5000);
+
 fetch("/api/stats").then(r => r.json()).then(d => {
+  clearTimeout(statsTimeout);
   elCount.textContent = d.articles.toLocaleString();
   elCount2.textContent = d.articles.toLocaleString();
 });

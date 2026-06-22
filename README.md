@@ -48,17 +48,7 @@ node backend/src/index.js
 
 Frontend + backend at `http://localhost:3000`.
 
-### Production (Render)
-
-```bash
-# Render build command
-npm install
-
-# Render start command
-node backend/src/index.js
-```
-
-Set env vars (`OPENAI_API_KEY`, `OPENROUTER_API_KEY`) in the Render dashboard — no `.env` file needed. The backend serves both the API and the built frontend on a single port.
+Set env vars (`OPENAI_API_KEY`, `OPENROUTER_API_KEY`) in  `.env` file needed. 
 
 ## Requirements
 

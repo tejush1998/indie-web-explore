@@ -1,0 +1,12 @@
+{
+  "type": "module",
+  "name": "",
+  "version": "",
+  "dependencies": {
+    "@lancedb/lancedb": "^0.30.0",
+    "adm-zip": "^0.5.17",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "openai": "^6.44.0"
+  }
+}

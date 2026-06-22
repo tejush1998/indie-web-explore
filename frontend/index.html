@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Indie Web</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fafafa; color: #222; height: 100vh; display: flex; flex-direction: column; }
+
+  .header { padding: 10px 20px; max-width: 760px; margin: 0 auto; width: 100%; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #eee; flex-shrink: 0; }
+  .header h1 { font-size: 16px; cursor: pointer; }
+  .header .sub { font-size: 11px; color: #aaa; }
+
+  .hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 20px; }
+  .hero.hidden { display: none; }
+  .hero .welcome { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+  .hero .subtitle { font-size: 14px; color: #888; margin-bottom: 28px; }
+  .hero-input { display: flex; gap: 6px; width: 100%; max-width: 480px; }
+  .hero-input input { flex: 1; padding: 12px 18px; font-size: 15px; border: 2px solid #ddd; border-radius: 28px; outline: none; }
+  .hero-input input:focus { border-color: #4a90d9; }
+  .hero-input button { padding: 12px 26px; font-size: 15px; background: #4a90d9; color: #fff; border: none; border-radius: 28px; cursor: pointer; }
+
+  .results-area { flex: 1; overflow-y: auto; padding: 30px 20px 20px; max-width: 760px; margin: 0 auto; width: 100%; display: none; }
+  .results-area.show { display: block; }
+
+  .search-row { margin-bottom: 24px; display: flex; gap: 6px; width: 100%; max-width: 480px; }
+  .search-row input { flex: 1; padding: 10px 16px; font-size: 14px; border: 2px solid #ddd; border-radius: 24px; outline: none; }
+  .search-row input:focus { border-color: #4a90d9; }
+  .search-row button { padding: 10px 20px; font-size: 14px; background: #4a90d9; color: #fff; border: none; border-radius: 24px; cursor: pointer; }
+
+  .followups { margin-bottom: 18px; }
+  .followups .label { font-size: 12px; color: #999; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+  .followups-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .followup-pill { padding: 8px 16px; border-radius: 24px; border: 2px solid #e0e0e0; background: #fff; font-size: 13px; cursor: pointer; transition: all .2s; }
+  .followup-pill:hover { border-color: #4a90d9; background: #e8f0fe; }
+
+  .result-card { background: #fff; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); animation: fadeIn .3s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+  .result-card h3 { font-size: 14px; margin-bottom: 2px; }
+  .result-card h3 a { color: #1a0dab; text-decoration: none; }
+  .result-card h3 a:hover { text-decoration: underline; }
+  .result-card .meta { font-size: 11px; color: #888; margin-bottom: 3px; }
+  .result-card .excerpt { font-size: 13px; color: #555; line-height: 1.5; }
+
+  .loading { display: none; text-align: center; padding: 60px 20px; color: #888; }
+  .loading.show { display: block; }
+  .spinner { width: 24px; height: 24px; border: 3px solid #eee; border-top-color: #4a90d9; border-radius: 50%; animation: spin .6s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1 onclick="resetView()">⚡ indie web</h1>
+  <div class="sub"><span id="count">—</span></div>
+</div>
+
+<div class="hero" id="hero">
+  <div class="welcome">What are you in the mood for?</div>
+  <div class="subtitle"><span id="count2">—</span> articles from the independent web</div>
+  <div class="hero-input">
+    <input id="heroInput" type="text" placeholder="type anything..." autofocus>
+    <button id="heroGo">Go</button>
+  </div>
+</div>
+
+<div class="loading" id="loading">
+  <div class="spinner"></div>
+  <div>digging through the indie web...</div>
+</div>
+
+<div class="results-area" id="area">
+  <div class="search-row">
+    <input id="resInput" type="text" placeholder="type anything...">
+    <button id="resGo">Go</button>
+  </div>
+  <div id="resultsContent"></div>
+</div>
+
+<script>
+const hero = document.getElementById("hero");
+const loading = document.getElementById("loading");
+const area = document.getElementById("area");
+const resContent = document.getElementById("resultsContent");
+const elCount = document.getElementById("count");
+const elCount2 = document.getElementById("count2");
+
+const heroInput = document.getElementById("heroInput");
+const heroGo = document.getElementById("heroGo");
+const resInput = document.getElementById("resInput");
+const resGo = document.getElementById("resGo");
+
+fetch("/api/stats").then(r => r.json()).then(d => {
+  elCount.textContent = d.articles.toLocaleString();
+  elCount2.textContent = d.articles.toLocaleString();
+});
+
+function resetView() {
+  hero.classList.remove("hidden");
+  area.classList.remove("show");
+  loading.classList.remove("show");
+  resContent.innerHTML = "";
+  setTimeout(() => heroInput.focus(), 100);
+}
+
+function search(query) {
+  if (!query) return;
+  hero.classList.add("hidden");
+  loading.classList.add("show");
+  area.classList.remove("show");
+  resContent.innerHTML = "";
+
+  fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: query, sessionId: crypto.randomUUID(), skipQuestions: true }),
+  }).then(r => r.json()).then(data => {
+    loading.classList.remove("show");
+    let html = "";
+
+    if (data.action === "results") {
+      if (data.followUps && data.followUps.length) {
+        html += `<div class="followups"><div class="label">Ideas</div><div class="followups-grid" id="fuGrid"></div></div>`;
+      }
+      for (const r of data.results) {
+        html += `
+          <div class="result-card">
+            <h3><a href="${r.link}" target="_blank">${r.title}</a></h3>
+            <div class="meta">${r.feedTitle} <span style="color:#ccc">·</span> ${r.pubDate || ""}</div>
+            <div class="excerpt">${r.excerpt}...</div>
+          </div>
+        `;
+      }
+    } else {
+      html = `<div style="font-size:14px;color:#666;margin-bottom:16px">${data.message}</div>`;
+    }
+
+    resContent.innerHTML = html;
+    area.classList.add("show");
+    resInput.value = query;
+    setTimeout(() => resInput.focus(), 100);
+
+    if (data.followUps) {
+      const grid = document.getElementById("fuGrid");
+      if (grid) {
+        for (const fu of data.followUps) {
+          const pill = document.createElement("div");
+          pill.className = "followup-pill";
+          pill.textContent = fu;
+          pill.addEventListener("click", () => { resInput.value = fu; search(fu); });
+          grid.appendChild(pill);
+        }
+      }
+    }
+  });
+}
+
+heroInput.addEventListener("keydown", e => { if (e.key === "Enter") search(heroInput.value.trim()); });
+heroGo.addEventListener("click", () => search(heroInput.value.trim()));
+resInput.addEventListener("keydown", e => { if (e.key === "Enter") search(resInput.value.trim()); });
+resGo.addEventListener("click", () => search(resInput.value.trim()));
+</script>
+</body>
+</html>

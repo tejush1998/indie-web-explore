@@ -4,7 +4,7 @@
 
 Semantic search engine for the independent web. Tell it what you're in the mood for — "weird DIY tech projects," "solo travel in Southeast Asia," "burnout and career changes" — and it finds blog posts that match the meaning, not just keywords.
 
-Built with Express, LanceDB (vector search), OpenAI embeddings, and OpenRouter (DeepSeek) for query rewriting and follow-up suggestions.
+Built with Express, LanceDB (vector search), OpenAI embeddings, and OpenRouter (DeepSeek) for query rewriting and follow-up suggestions. The vector index is built from [indieblog.page](https://indieblog.page/all) — you'll need to create it yourself (see setup).
 
 ## How it works
 
@@ -20,14 +20,30 @@ Your query → AI rewrites into diverse search queries → OpenAI embeddings →
 
 ![App screenshot](readme-images/image1.png) ![Results breakdown](readme-images/image2.png)
 
-## Quick start
+## Setup
+
+### 1. Scrape + embed
+
+The search data comes from [indieblog.page](https://indieblog.page/all). Scrape the feeds into a CSV with this exact schema:
+
+```
+feedUrl,feedTitle,title,link,pubDate,text
+```
+
+Then run the embed script to generate OpenAI embeddings and build the LanceDB index:
+
+```bash
+# Place your articles.csv in the project root
+node scripts/embed.mjs
+```
+### 2. Configure and run
 
 ```bash
 cp .env.example .env
 # Edit .env — set OPENAI_API_KEY and OPENROUTER_API_KEY
 
 npm install
-node backend/bootstrap.js
+node backend/src/index.js
 ```
 
 Frontend + backend at `http://localhost:3000`.
@@ -39,10 +55,10 @@ Frontend + backend at `http://localhost:3000`.
 npm install
 
 # Render start command
-node backend/bootstrap.js
+node backend/src/index.js
 ```
 
-Set env vars (`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `DB_URL`) in the Render dashboard — no `.env` file needed. The backend serves both the API and the built frontend on a single port.
+Set env vars (`OPENAI_API_KEY`, `OPENROUTER_API_KEY`) in the Render dashboard — no `.env` file needed. The backend serves both the API and the built frontend on a single port.
 
 ## Requirements
 
@@ -53,18 +69,20 @@ Set env vars (`OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `DB_URL`) in the Render da
 
 - **Backend**: Express 5, LanceDB (vector DB), OpenAI API (embeddings), OpenRouter API (DeepSeek)
 - **Frontend**: Vanilla HTML + CSS + JS (no framework)
+- **Embedding pipeline**: csv-parse, tiktoken, scripts/embed.mjs
 - **DB**: LanceDB — 512-dim vector embeddings of indie blog articles
-- **Bootstrap**: adm-zip to extract pre-built database, dotenv for config
+
 
 ## Project structure
 
 ```
 ├── backend/
-│   ├── bootstrap.js    Downloads & extracts the pre-built LanceDB
 │   └── src/
 │       └── index.js    Express server — /api/chat, /api/search, /api/stats
 ├── frontend/
 │   └── index.html      Single-page app
+├── scripts/
+│   └── embed.mjs       Reads articles.csv, generates embeddings, builds LanceDB
 ├── data/               LanceDB database (gitignored)
 ├── .env                DB_URL, OPENAI_API_KEY, OPENROUTER_API_KEY
 └── package.json

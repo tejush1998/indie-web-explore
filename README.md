@@ -1,24 +1,24 @@
-# Gist — Semantic search for the indie web
+# Indie Web Explorer — Semantic search for the indie web
 
 **[indie-web-explore.onrender.com](https://indie-web-explore.onrender.com/)**
 
-Gist is a semantic search engine for the independent web. Tell it what you're in the mood for — "weird DIY tech projects," "solo travel in Southeast Asia," "burnout and career changes" — and it finds blog posts that match the meaning, not just keywords.
+Semantic search engine for the independent web. Tell it what you're in the mood for — "weird DIY tech projects," "solo travel in Southeast Asia," "burnout and career changes" — and it finds blog posts that match the meaning, not just keywords.
 
-Built with Express, LanceDB (vector search), OpenAI embeddings, and DeepSeek (via OpenRouter) for conversational query refinement.
+Built with Express, LanceDB (vector search), OpenAI embeddings, and OpenRouter (DeepSeek) for query rewriting and follow-up suggestions.
 
 ## How it works
 
 ```
-Your query → AI chat agent (clarify or search) → OpenAI embedding → LanceDB vector search → results + follow-up ideas
+Your query → AI rewrites into diverse search queries → OpenAI embeddings → LanceDB vector search → results + follow-up ideas
 ```
 
 1. Type what you're looking for — natural language, no keyword tricks
-2. The AI agent asks 0–3 clarifying questions or searches directly
-3. OpenAI `text-embedding-3-small` converts the query into a 512-dimension vector
+2. DeepSeek (via OpenRouter) rewrites your query into a few diverse search angles
+3. OpenAI `text-embedding-3-small` embeds each search phrase into a 512-dim vector
 4. LanceDB finds the most semantically similar articles from the indie web
 5. Results appear with links, feed sources, and follow-up suggestions to keep exploring
 
-![App screenshot](readme-images/image1.png)
+![App screenshot](readme-images/image1.png) ![Results breakdown](readme-images/image2.png)
 
 ## Quick start
 

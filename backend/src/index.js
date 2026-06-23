@@ -5,8 +5,15 @@ import * as lancedb from "@lancedb/lancedb";
 import crypto from "node:crypto";
 import path from "path";
 
-// Clients: OpenAI for embeddings, OpenRouter for chat
-const embedClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+function log(...args) {
+  console.log(`[${new Date().toISOString()}]`, ...args);
+}
+
+// Both embeddings and chat go through OpenRouter
+const embedClient = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+});
 const chatClient = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
@@ -28,8 +35,9 @@ let table,
 try {
   table = await db.openTable("articles");
   totalRows = await table.countRows();
-} catch {
-  console.log("No articles yet — embed.mjs hasn't finished or started");
+  log(`DB loaded — ${totalRows} articles`);
+} catch (err) {
+  log(`DB init failed: ${err.message}`);
 }
 
 function format(r) {
@@ -49,31 +57,40 @@ function format(r) {
 }
 
 async function searchTable(queryVector, targetLimit) {
-  if (!table) return [];
+  if (!table) {
+    log("searchTable skipped — no table");
+    return [];
+  }
   const fetch = Math.min(targetLimit * 5, 500);
   const raw = await table.search(queryVector).limit(fetch).toArray();
   const filtered = raw.filter((r) => hasContent(r.text));
+  log(`searchTable: ${raw.length} raw → ${filtered.length} filtered`);
   return filtered.slice(0, targetLimit).map(format);
 }
 
 async function searchQueries(queries, perQuery = 8) {
+  log(`searchQueries: embedding ${queries.length} queries: ${queries.join(" | ")}`);
   const resp = await embedClient.embeddings.create({
-    model: "text-embedding-3-small",
+    model: "openai/text-embedding-3-small",
     input: queries.map((s) => s.trim().slice(0, 1000)),
     dimensions: DIMS,
+    timeout: 15000,
   });
+  log(`searchQueries: got ${resp.data.length} embeddings`);
   const all = [];
   for (let i = 0; i < resp.data.length; i++) {
     all.push(...(await searchTable(resp.data[i].embedding, perQuery)));
   }
   const seen = new Set();
-  return all
+  const deduped = all
     .filter((r) => {
       if (seen.has(r.link)) return false;
       seen.add(r.link);
       return true;
     })
     .slice(0, 15);
+  log(`searchQueries: ${all.length} total → ${deduped.length} deduped`);
+  return deduped;
 }
 
 // Session store
@@ -116,21 +133,26 @@ app.get("/api/stats", async (_, res) => {
   let count = 0;
   try {
     count = await (await db.openTable("articles")).countRows();
-  } catch {}
+  } catch (err) {
+    log(`GET /api/stats error: ${err.message}`);
+  }
   res.json({ articles: count });
 });
 
 app.post("/api/search", async (req, res) => {
   const { q, limit = 20 } = req.body;
   if (!q || !q.trim()) return res.json({ results: [] });
+  log(`POST /api/search q="${q.slice(0, 80)}"`);
 
   const resp = await embedClient.embeddings.create({
-    model: "text-embedding-3-small",
+    model: "openai/text-embedding-3-small",
     input: q,
     dimensions: DIMS,
+    timeout: 15000,
   });
 
   const results = await searchTable(resp.data[0].embedding, limit);
+  log(`POST /api/search → ${results.length} results`);
   res.json({ results });
 });
 
@@ -141,6 +163,7 @@ app.post("/api/chat", async (req, res) => {
 
   const sid = sessionId || crypto.randomUUID();
   const session = getSession(sid);
+  log(`POST /api/chat sid=${sid.slice(0, 8)}… msg="${message.slice(0, 80)}" qCount=${session.questionCount}`);
 
   session.history.push({ role: "user", content: message });
 
@@ -155,32 +178,40 @@ app.post("/api/chat", async (req, res) => {
     );
   }
 
+  log(`chat: calling OpenRouter (forceSearch=${forceSearch})`);
+  // await new Promise(r => setTimeout(r, 20000)); // TODO: remove — simulates timeout
   const resp = await chatClient.chat.completions.create({
     model: "deepseek/deepseek-v4-flash",
     messages: [{ role: "system", content: systemMsg }, ...session.history],
     max_tokens: 500,
+    timeout: 15000,
   });
 
   const raw = resp.choices[0].message.content;
+  log(`chat: OpenRouter responded (${raw.length} chars)`);
   let decision;
   try {
     decision = JSON.parse(raw.replace(/```json\s*|```/g, "").trim());
-  } catch {
+  } catch (err) {
+    log(`chat: JSON parse failed — raw response: "${raw.slice(0, 200)}"`);
     decision = { action: "ask", message: raw };
   }
 
   if (decision.action === "search" || forceSearch) {
     const queries = decision.queries?.filter((q) => q?.trim()) || [];
     if (queries.length === 0) queries.push(message);
+    log(`chat: action=search queries=${queries.join(" | ")}`);
     session.history.push({
       role: "assistant",
       content: `[Searched for: ${queries.join(", ")}]`,
     });
     const results = await searchQueries(queries);
+    log(`chat: search returned ${results.length} results`);
 
     // Generate follow-up suggestions based on what was found
     let followUps = [];
     try {
+      log("chat: generating follow-ups");
       const fu = await chatClient.chat.completions.create({
         model: "deepseek/deepseek-v4-flash",
         messages: [
@@ -198,10 +229,14 @@ app.post("/api/chat", async (req, res) => {
           },
         ],
         max_tokens: 200,
+        timeout: 15000,
       });
       const raw = fu.choices[0].message.content;
       followUps = JSON.parse(raw.replace(/```json\s*|```/g, "").trim());
-    } catch {} // graceful fallback — no suggestions
+      log(`chat: got ${followUps.length} follow-ups`);
+    } catch (err) {
+      log(`chat: follow-ups failed: ${err.message}`);
+    }
     res.json({
       action: "results",
       sessionId: sid,
@@ -213,6 +248,7 @@ app.post("/api/chat", async (req, res) => {
   } else {
     session.questionCount++;
     session.history.push({ role: "assistant", content: decision.message });
+    log(`chat: action=ask questionCount=${session.questionCount}`);
     res.json({
       action: "ask",
       sessionId: sid,

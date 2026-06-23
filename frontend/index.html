@@ -116,11 +116,21 @@ function search(query) {
   area.classList.remove("show");
   resContent.innerHTML = "";
 
+  const controller = new AbortController();
+  const t = setTimeout(() => {
+    controller.abort();
+    loading.classList.remove("show");
+    resContent.innerHTML = `<div style="text-align:center;padding:50px 20px;color:#888;font-size:15px;line-height:1.7">Looks like the indie web is thinking really hard out there.<br><a href="javascript:location.reload()" style="color:#4a90d9;font-weight:600">Refresh the page</a> and give it another shot — you're one search away from something great.</div>`;
+    area.classList.add("show");
+  }, 15000);
+
   fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message: query, sessionId: crypto.randomUUID(), skipQuestions: true }),
+    signal: controller.signal,
   }).then(r => r.json()).then(data => {
+    clearTimeout(t);
     loading.classList.remove("show");
     let html = "";
 
@@ -158,6 +168,12 @@ function search(query) {
         }
       }
     }
+  }).catch(err => {
+    if (err.name === "AbortError") return;
+    clearTimeout(t);
+    loading.classList.remove("show");
+    resContent.innerHTML = `<div style="text-align:center;padding:50px 20px;color:#888;font-size:15px;line-height:1.7">Something glitched on the way to the indie web.<br><a href="javascript:location.reload()" style="color:#4a90d9;font-weight:600">Refresh the page</a> and try again — there are treasures waiting to be found.</div>`;
+    area.classList.add("show");
   });
 }
 

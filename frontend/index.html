@@ -122,7 +122,7 @@ function search(query) {
     loading.classList.remove("show");
     resContent.innerHTML = `<div style="text-align:center;padding:50px 20px;color:#888;font-size:15px;line-height:1.7">Looks like the indie web is thinking really hard out there.<br><a href="javascript:location.reload()" style="color:#4a90d9;font-weight:600">Refresh the page</a> and give it another shot — you're one search away from something great.</div>`;
     area.classList.add("show");
-  }, 15000);
+  }, 30000);
 
   fetch("/api/chat", {
     method: "POST",
